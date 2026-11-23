@@ -226,6 +226,8 @@ body {
   right: 1rem;
   bottom: 1rem;
   width: clamp(168px, 18vw, 232px);
+  transform: scale(0.95);
+  transform-origin: bottom right;
   z-index: 20;
   user-select: none;
   pointer-events: none;
@@ -236,7 +238,7 @@ body {
   width: 100%;
   height: clamp(220px, 28vw, 320px);
   overflow: hidden;
-  background: transparent;
+  background: rgba(128, 128, 128, 0.3);
 }
 
 .live2d-canvas {
