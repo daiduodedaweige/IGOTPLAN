@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>I GOT PLAN</title>
+    <script>
+      try {
+        const theme = localStorage.getItem("daily-plan-board:theme");
+        if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="top">
+        <div class="top-row">
+          <h1>I GOT PLAN</h1>
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="深色模式" aria-pressed="false" title="切换到深色模式">
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20.9 13.1A9 9 0 0 1 10.9 3.1a9 9 0 1 0 10 10Z" />
+            </svg>
+            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+            </svg>
+            <span id="theme-toggle-label">深色模式</span>
+          </button>
+        </div>
+        <p>记录任务，赚取积分，兑换奖励。</p>
+      </header>
+
+      <section class="panel data-panel" aria-label="数据保存与备份">
+        <div class="data-panel-head">
+          <p id="save-status" role="status" aria-live="polite">正在加载服务器数据…</p>
+          <details id="data-menu" class="data-menu">
+            <summary class="data-menu-toggle">
+              数据管理
+              <svg class="data-menu-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
+            <div class="data-menu-items">
+              <button id="export-data" class="ghost" type="button" disabled>导出数据</button>
+              <button id="import-data" class="ghost" type="button" disabled>导入文件</button>
+              <input id="import-file" type="file" accept=".json,application/json" hidden />
+            </div>
+          </details>
+        </div>
+        <p id="storage-warning" class="storage-warning" role="alert" hidden></p>
+        <div id="data-actions" class="data-actions" hidden>
+          <button id="retry-save" type="button" hidden>重试保存</button>
+          <button id="reload-data" class="ghost" type="button" hidden>重新加载</button>
+          <button id="import-legacy" type="button" hidden>导入浏览器旧数据</button>
+          <button id="export-legacy" class="ghost" type="button" hidden>导出浏览器旧数据</button>
+          <select id="recovery-select" aria-label="选择未保存记录" hidden></select>
+          <button id="restore-pending" type="button" hidden>恢复未保存内容</button>
+          <button id="discard-pending" class="ghost" type="button" hidden>保留服务器数据</button>
+        </div>
+      </section>
+
+      <section class="panel summary-panel" aria-labelledby="summary-title">
+        <div class="summary-layout">
+          <div>
+            <div class="list-head">
+              <h2 id="summary-title">积分概览</h2>
+              <button id="reset-points" class="ghost mini-ghost" type="button">重置积分</button>
+            </div>
+            <div class="stats">
+              <article class="stat-card">
+                <span class="stat-label">可用</span>
+                <strong id="available-points" class="stat-value">0</strong>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">获得</span>
+                <strong id="earned-points" class="stat-value">0</strong>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">已花费</span>
+                <strong id="spent-points" class="stat-value">0</strong>
+              </article>
+            </div>
+          </div>
+
+          <aside class="usage-panel" aria-labelledby="usage-title">
+            <div class="usage-head">
+              <h3 id="usage-title">用量导航</h3>
+            </div>
+
+            <div class="usage-links">
+              <a
+                class="link-button"
+                href="https://i.ai901.top/dashboard"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                JW_PROXY
+              </a>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="grid creation-grid" aria-label="新建任务与奖励">
+        <details class="panel creation-panel" aria-labelledby="new-task-title">
+          <summary class="creation-toggle">
+            <h2 id="new-task-title">
+              新建任务
+              <svg class="creation-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </h2>
+          </summary>
+          <form id="task-form" class="form">
+            <label>
+              日期
+              <input id="task-date" type="date" required />
+            </label>
+
+            <label>
+              标题
+              <input id="task-title" type="text" placeholder="例如：读完第三章" maxlength="80" required />
+            </label>
+
+            <fieldset class="todo-editor">
+              <legend>TodoList 子任务</legend>
+              <div class="todo-add-row">
+                <input id="task-todo-input" type="text" maxlength="80" placeholder="输入一个子任务" aria-label="子任务内容" />
+                <button id="add-task-todo" class="ghost" type="button">添加子任务</button>
+              </div>
+              <ul id="task-todo-list" class="todo-list" aria-label="待添加的子任务" aria-live="polite" hidden></ul>
+              <p class="field-hint">逐条添加，按回车也可以添加。</p>
+              <p id="task-todo-error" class="todo-error" role="alert" hidden></p>
+            </fieldset>
+
+            <label>
+              积分
+              <input id="task-points" type="number" min="1" max="1000000000" step="1" value="10" required />
+            </label>
+
+            <label>
+              任务类型
+              <select id="task-type" required>
+                <option value="single">单次任务</option>
+                <option value="long-term">长期任务</option>
+              </select>
+            </label>
+
+            <button type="submit">添加任务</button>
+          </form>
+        </details>
+
+        <details class="panel creation-panel" aria-labelledby="new-reward-title">
+          <summary class="creation-toggle">
+            <h2 id="new-reward-title">
+              新建奖励
+              <svg class="creation-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </h2>
+          </summary>
+          <form id="reward-form" class="form">
+            <label>
+              奖励名称
+              <input id="reward-title" type="text" placeholder="例如：看一集剧" maxlength="80" required />
+            </label>
+
+            <label>
+              备注
+              <textarea id="reward-notes" rows="3" maxlength="10000" placeholder="可选"></textarea>
+            </label>
+
+            <label>
+              所需积分
+              <input id="reward-cost" type="number" min="1" max="1000000000" step="1" value="20" required />
+            </label>
+
+            <label>
+              数量
+              <input id="reward-quantity" type="number" min="0" max="1000000000" step="1" value="1" required />
+            </label>
+
+            <button type="submit">添加奖励</button>
+          </form>
+        </details>
+      </section>
+
+      <section class="grid">
+        <section class="panel" aria-labelledby="task-list-title">
+          <div class="list-head">
+            <h2 id="task-list-title">我的任务</h2>
+            <button id="clear-tasks" class="ghost mini-ghost" type="button">清空任务</button>
+          </div>
+          <div id="task-list" class="list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="reward-list-title">
+          <div class="list-head">
+            <h2 id="reward-list-title">我的奖励</h2>
+            <button id="clear-rewards" class="ghost mini-ghost" type="button">清空奖励</button>
+          </div>
+          <div id="reward-list" class="list" aria-live="polite"></div>
+        </section>
+      </section>
+    </main>
+
+    <div id="celebration-layer" class="celebration-layer" aria-live="polite"></div>
+
+    <aside id="live2d-dock" class="live2d-dock" aria-label="Live2D 白猫 Tororo">
+      <div class="live2d-frame">
+        <canvas id="live2d-canvas" class="live2d-canvas" width="240" height="320"></canvas>
+      </div>
+      <p id="live2d-status" class="live2d-status">Live2D sample loading...</p>
+    </aside>
+
+    <template id="task-template">
+      <details class="card task-card">
+        <summary class="task-card-toggle">
+          <div class="task-card-head">
+            <h3 class="title"></h3>
+            <span class="completion-stamp" role="img" aria-label="已完成" hidden>
+              <span class="stamp-label" aria-hidden="true">已完成</span>
+              <span class="stamp-count" aria-hidden="true" hidden></span>
+            </span>
+            <svg class="task-card-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+          <div class="task-summary-meta">
+            <time class="date"></time>
+            <span class="type-badge"></span>
+            <span class="task-points-summary"></span>
+            <span class="task-status"></span>
+            <span class="task-todo-summary" hidden></span>
+          </div>
+        </summary>
+        <div class="task-card-content">
+          <div class="task-edit-row">
+            <button class="rename-task ghost mini-ghost" type="button">修改任务名</button>
+            <button class="points-badge" type="button"></button>
+          </div>
+          <p class="notes"></p>
+          <section class="task-todos" aria-label="任务子清单">
+            <div class="todo-heading">
+              <span class="todo-progress"></span>
+              <button class="add-todo ghost mini-ghost" type="button">添加子任务</button>
+            </div>
+            <ul class="todo-list" aria-label="子任务清单" hidden></ul>
+          </section>
+          <p class="task-progress"></p>
+          <p class="completion-hint field-hint" hidden></p>
+          <div class="actions">
+            <button class="complete" type="button">完成</button>
+            <button class="danger" type="button">删除</button>
+          </div>
+        </div>
+      </details>
+    </template>
+
+    <template id="reward-template">
+      <article class="card reward-card">
+        <div class="card-top">
+          <div class="meta">
+            <span class="reward-status">可兑换</span>
+          </div>
+          <button class="points-badge" type="button"></button>
+        </div>
+        <h3 class="title"></h3>
+        <p class="notes"></p>
+        <div class="tag-row">
+          <button class="stock-badge" type="button"></button>
+        </div>
+        <p class="redeemed-count"></p>
+        <div class="actions">
+          <button class="redeem" type="button">兑换</button>
+          <button class="danger" type="button">删除</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="assets/vendor/pixi.min.js"></script>
+    <script src="assets/live2d/core/live2dcubismcore.min.js"></script>
+    <script src="assets/vendor/cubism4.min.js"></script>
+    <script src="state-model.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

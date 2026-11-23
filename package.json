@@ -1,0 +1,26 @@
+{
+  "name": "igotplan",
+  "version": "1.0.0",
+  "description": "Personal task and reward board with persistent server storage",
+  "main": "script.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "backup": "node scripts/data.js backup",
+    "restore": "node scripts/data.js restore"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "pixi-live2d-display": "^0.4.0",
+    "pixi.js": "^6.5.10"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}
