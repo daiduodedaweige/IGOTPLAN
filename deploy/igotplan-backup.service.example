@@ -4,8 +4,9 @@ After=igotplan.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/nfs/home/weijing/workspace/IGOTPLAN
-ExecStart=/nfs/home/weijing/.nvm/versions/node/v24.15.0/bin/node /nfs/home/weijing/workspace/IGOTPLAN/scripts/data.js backup
+# Replace the project and Node.js paths before installing this service.
+WorkingDirectory=/absolute/path/to/IGOTPLAN
+ExecStart=/absolute/path/to/node /absolute/path/to/IGOTPLAN/scripts/data.js backup
 # Create this file with BACKUP_DEST=/absolute/path/on/independent/storage
 EnvironmentFile=%h/.config/igotplan/backup.env
 Environment=API_URL=http://127.0.0.1:8000

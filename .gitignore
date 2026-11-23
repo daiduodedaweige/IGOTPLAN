@@ -1,6 +1,30 @@
+# Dependencies
 node_modules/
+
+# Local application data and logs
 data/
 logs/
 *.log
+
+# Local environment and deployment configuration
 .env
+.env.*
+!.env.example
+/deploy/*.service
+/deploy/*.timer
+/deploy/*.env
+
+# Local AI tool history and caches
+/.aider.chat.history.md
+/.aider.input.history
+/.aider.tags.cache*/
+/.codex
+
+# Generated files
 test-results/
+__pycache__/
+*.py[cod]
+
+# Original downloads and obsolete screenshots
+/tororo_hijiki_ja.zip
+/image.png

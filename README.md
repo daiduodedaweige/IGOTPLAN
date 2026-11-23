@@ -22,17 +22,17 @@
 
 需要 Node.js 24 或以上。运行所需的网页资源已在 `assets/` 中，后端使用 Node.js 内置模块，无需安装新的依赖。
 
-在 open01 执行：
+在项目所在的服务器上执行，将路径替换为实际项目目录：
 
 ```bash
-cd /nfs/home/weijing/workspace/IGOTPLAN
+cd /absolute/path/to/IGOTPLAN
 npm start
 ```
 
-在个人电脑另开终端，保持 SSH 隧道连接：
+在个人电脑另开终端，将 `your-user@your-server` 替换为实际的 SSH 用户和服务器地址，保持隧道连接：
 
 ```bash
-ssh -N -L 8000:127.0.0.1:8000 weijing@open01.boscszcluster.com
+ssh -N -L 8000:127.0.0.1:8000 your-user@your-server
 ```
 
 打开 <http://localhost:8000>。若本地 8000 被占用，可改为 `-L 18000:127.0.0.1:8000`，再访问 <http://localhost:18000>。更换本地端口不会改变服务端数据，但该端口下浏览器的旧记录和恢复副本仍受浏览器来源隔离。
@@ -48,7 +48,7 @@ ssh -N -L 8000:127.0.0.1:8000 weijing@open01.boscszcluster.com
 | `API_URL` | `http://127.0.0.1:8000` | 独立备份工具读取数据的地址 |
 | `BACKUP_DEST` | 无 | 定时备份的独立存储目录 |
 
-例如 `PORT=18000 DATA_DIR=/绝对路径/igotplan-data npm start`。不要将数据目录放在 `assets/`、项目根目录、项目的上级目录或 `/tmp`。项目位于 NFS，数据实际保存在 NFS 上；默认采用单进程 JSON 存储。此版本按个人 SSH 访问设计，公网或多人使用需另行配置认证、HTTPS 和网络入口。
+例如 `PORT=18000 DATA_DIR=/绝对路径/igotplan-data npm start`。不要将数据目录放在 `assets/`、项目根目录、项目的上级目录或 `/tmp`。若项目放在 NFS 上，默认的数据目录也位于 NFS；本项目采用单进程 JSON 存储。此版本按个人 SSH 访问设计，公网或多人使用需另行配置认证、HTTPS 和网络入口。
 
 ## 保存与旧数据迁移
 
@@ -102,17 +102,18 @@ npm start
 
 调试时可用 `tmux new -s igotplan` 后执行 `npm start`，按 `Ctrl+B`、`D` 分离，通过 `tmux attach -t igotplan` 返回。tmux 不提供开机自启和进程异常恢复。
 
-长期使用可在 open01 的实际登录会话中配置用户级 systemd。先确认 `command -v node` 与服务示例的绝对路径一致；Node.js 升级或项目移动后也要更新示例路径。
+长期使用可在服务器的实际登录会话中配置用户级 systemd。复制服务示例后，先编辑安装的 `igotplan.service`：将 `/absolute/path/to/IGOTPLAN` 替换为实际项目目录，将 `/absolute/path/to/node` 替换为 `command -v node` 输出的绝对路径。Node.js 升级或项目移动后也要更新这些路径。
 
 ```bash
 mkdir -p ~/.config/systemd/user
 cp deploy/igotplan.service.example ~/.config/systemd/user/igotplan.service
+${EDITOR:-vi} ~/.config/systemd/user/igotplan.service
 systemctl --user daemon-reload
 systemctl --user enable --now igotplan.service
-loginctl enable-linger weijing
+loginctl enable-linger "$USER"
 ```
 
-如果配置 linger 需要主机管理员权限，由管理员在主机上设置。验证 `loginctl show-user weijing -p Linger` 返回 `Linger=yes`，并实际验证退出 SSH 后服务仍可访问、异常退出后能重启，以及主机重启后能启动。
+如果配置 linger 需要主机管理员权限，由管理员在主机上设置。验证 `loginctl show-user "$USER" -p Linger` 返回 `Linger=yes`，并实际验证退出 SSH 后服务仍可访问、异常退出后能重启，以及主机重启后能启动。
 
 ```bash
 systemctl --user status igotplan.service
@@ -131,11 +132,12 @@ journalctl --user -u igotplan.service -n 100 --no-pager
 BACKUP_DEST=/绝对路径/独立存储/igotplan-backups
 ```
 
-如修改后端端口，同步修改备份服务示例中的 `API_URL`。安装并先手动验证一次，再启用定时器：
+复制备份服务示例后，同样编辑安装的服务文件，将项目和 Node.js 路径替换为实际值。如修改后端端口，同步修改其中的 `API_URL`。先手动验证一次，再启用定时器：
 
 ```bash
 cp deploy/igotplan-backup.service.example ~/.config/systemd/user/igotplan-backup.service
 cp deploy/igotplan-backup.timer.example ~/.config/systemd/user/igotplan-backup.timer
+${EDITOR:-vi} ~/.config/systemd/user/igotplan-backup.service
 systemctl --user daemon-reload
 systemctl --user start igotplan-backup.service
 systemctl --user enable --now igotplan-backup.timer
@@ -162,12 +164,20 @@ python3 scripts/import_tororo.py /完整路径/模型压缩包.zip
 
 导入工具检查资源是否完整、MOC3 格式是否受当前 Core 支持，再复制所需文件、映射待机与点击动作组，并修改 `script.js` 的 `LIVE2D_MODEL`。已有 `assets/live2d/Tororo/` 时拒绝覆盖；重新导入前需先将该目录移出项目保留。模型来源与使用条件记录在 `assets/live2d/Tororo/SOURCE.md`，原始模型说明保存在同目录的 `ReadMe.txt`。
 
+## 仓库与本地文件
+
+源码、测试、`package-lock.json`、页面直接加载的 `assets/` 资源及其来源和许可说明应保留在仓库中。`.github/images/overview.png` 用于项目介绍，也随代码提交。
+
+个人任务与备份位于 `data/`，日志位于 `logs/`；这两个目录以及 `node_modules/`、本地 AI 工具记录和缓存、原始模型压缩包 `tororo_hijiki_ja.zip`、旧截图 `image.png` 均由 `.gitignore` 排除。更新代码时保留本地数据，并按前文方式另行备份；新克隆的仓库不包含这些本地文件。
+
+环境配置使用本地 `.env` 或 `.env.*` 文件时不要提交，通用模板可命名为 `.env.example`。应用通过进程环境变量读取配置，不会自动加载这些文件。`deploy/` 中的 `*.example` 是可提交的通用部署模板；实际配置的 `*.service`、`*.timer` 和 `*.env` 文件只在本地保留。
+
 ## 验证
 
 ```bash
 npm test
 ```
 
-自动化测试仅使用临时数据目录，不访问实际的 `data/state.json`。实施及部署验证记录见 `plan.md`。
+自动化测试仅使用临时数据目录，不访问实际的 `data/state.json`。
 
 前端交互测试使用开发依赖 jsdom，首次运行测试前执行 `npm ci`。生产后端不依赖 jsdom，若只需启动服务，无需安装开发依赖。

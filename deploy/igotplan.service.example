@@ -7,11 +7,12 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-WorkingDirectory=/nfs/home/weijing/workspace/IGOTPLAN
-ExecStart=/nfs/home/weijing/.nvm/versions/node/v24.15.0/bin/node /nfs/home/weijing/workspace/IGOTPLAN/server.js
+# Replace the project and Node.js paths before installing this service.
+WorkingDirectory=/absolute/path/to/IGOTPLAN
+ExecStart=/absolute/path/to/node /absolute/path/to/IGOTPLAN/server.js
 Environment=HOST=127.0.0.1
 Environment=PORT=8000
-Environment=DATA_DIR=/nfs/home/weijing/workspace/IGOTPLAN/data
+Environment=DATA_DIR=/absolute/path/to/IGOTPLAN/data
 Environment=BACKUP_KEEP=30
 UMask=0077
 Restart=on-failure
