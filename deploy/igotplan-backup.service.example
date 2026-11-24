@@ -10,5 +10,7 @@ ExecStart=/absolute/path/to/node /absolute/path/to/IGOTPLAN/scripts/data.js back
 # Create this file with BACKUP_DEST=/absolute/path/on/independent/storage
 EnvironmentFile=%h/.config/igotplan/backup.env
 Environment=API_URL=http://127.0.0.1:8000
+# Must match the app data directory; the backup reads access.json here.
+Environment=DATA_DIR=/absolute/path/to/IGOTPLAN/data
 UMask=0077
 TimeoutStartSec=60

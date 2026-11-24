@@ -22,7 +22,7 @@
 
 ## 启动与访问
 
-需要 Node.js 24 或以上。运行所需的网页资源已在 `assets/` 中，后端使用 Node.js 内置模块，无需安装新的依赖。
+需要 Node.js 24.22.3 或更新的受支持安全版本；`.nvmrc` 固定当前验证过的 24.x 版本。运行所需的网页资源已在 `assets/` 中，后端使用 Node.js 内置模块，无需安装新的依赖。
 
 在项目所在的服务器上执行，将路径替换为实际项目目录：
 
@@ -37,7 +37,7 @@ npm start
 ssh -N -L 8000:127.0.0.1:8000 your-user@your-server
 ```
 
-打开 <http://localhost:8000>。若本地 8000 被占用，可改为 `-L 18000:127.0.0.1:8000`，再访问 <http://localhost:18000>。更换本地端口不会改变服务端数据，但该端口下浏览器的旧记录和恢复副本仍受浏览器来源隔离。
+打开 <http://localhost:8000>，在浏览器弹出的登录框输入本项目的访问账号和密码（见下一节）。若本地 8000 被占用，可改为 `-L 18000:127.0.0.1:8000`，再访问 <http://localhost:18000>。更换本地端口不会改变服务端数据，但该端口下浏览器的旧记录和恢复副本仍受浏览器来源隔离。
 
 不要通过 `file://` 或 `python -m http.server` 启动新版本；页面需要 Node.js 提供的 `/api/state`。
 
@@ -51,6 +51,45 @@ ssh -N -L 8000:127.0.0.1:8000 your-user@your-server
 | `BACKUP_DEST` | 无 | 定时备份的独立存储目录 |
 
 例如 `PORT=18000 DATA_DIR=/绝对路径/igotplan-data npm start`。不要将数据目录放在 `assets/`、项目根目录、项目的上级目录或 `/tmp`。若项目放在 NFS 上，默认的数据目录也位于 NFS；本项目采用单进程 JSON 存储。此版本按个人 SSH 访问设计，公网或多人使用需另行配置认证、HTTPS 和网络入口。
+
+### 访问认证
+
+服务默认启用 HTTP Basic 认证，页面、静态资源、读取和保存接口均需要认证。首次启动自动在数据目录创建 `access.json`，账号为 `plan`，密码为随机生成的 256 位密钥，与 SSH 密码无关。在服务器的项目目录运行以下命令查看，密码仅显示在当前终端：
+
+```bash
+npm run credentials
+```
+
+使用自定义数据目录时，查看、重置和备份命令都要设置相同的 `DATA_DIR`。`access.json` 含有可直接登录的密码，只允许所属用户读取（权限 `0600`），保存在 Git 忽略的数据目录中，不通过网页提供，也不写入服务日志。凭据格式或权限不安全时服务拒绝启动。可将密码保存到个人密码管理器。
+
+重启服务保留现有密码。需要换密码时，先停止服务，再重置并启动：
+
+```bash
+systemctl --user stop igotplan.service
+npm run credentials -- reset
+systemctl --user start igotplan.service
+```
+
+重置不修改任务、奖励或积分；旧密码在重新启动后失效。浏览器会缓存 Basic 登录，使用后关闭相关浏览器会话。当前 HTTP 入口应继续仅供本机和 SSH 隧道使用，远程网络流量由 SSH 加密；增加公网入口前需配置 HTTPS。
+
+认证可以阻止其他服务器账号直接通过本机端口访问看板；已经控制同一个 Linux 账号的进程仍可能读取凭据和数据。
+
+### Node.js 与依赖安全更新
+
+使用 nvm 时，在项目目录执行 `nvm install`、`nvm use`，会采用 `.nvmrc` 中的版本。更新 systemd 的 `ExecStart` 为新 Node.js 的绝对路径后，执行 `systemctl --user daemon-reload` 和 `systemctl --user restart igotplan.service`。交互式终端切换版本不会自动改变 systemd 使用的版本。
+
+当前服务器已为本项目安装到 Git 忽略的 `.runtime/node-v24.22.3-linux-x64/`，官方压缩包已按官方 `SHASUMS256.txt` 校验；systemd 直接使用其中 `bin/node` 的绝对路径，其他项目的 Node.js 保持原配置。`.runtime/` 不随 Git 克隆，新部署时需重新安装运行环境。
+
+`package.json` 使用 overrides 将 `gh-pages` 固定为修复原型污染的 6.3.0、`qs` 固定为 6.17.1；旧版 `brace-expansion` 随依赖链更新移除。浏览器使用的 `assets/vendor/pixi.min.js` 已用修复后的依赖重新构建。后续调整依赖时运行：
+
+```bash
+npm ci --ignore-scripts
+npm run build:vendor
+npm test
+npm audit
+```
+
+提交更新的锁文件和浏览器资源，并确认 Live2D 正常加载。不要直接使用 `npm audit fix --force`，它可能改变 Live2D 主版本或降级依赖。审计只反映数据库中的已知漏洞，需定期复查。
 
 ## 保存与旧数据迁移
 
@@ -88,6 +127,8 @@ npm run backup -- /绝对路径/独立存储/igotplan-backups
 ```
 
 独立快照保留最近 30 份。不要把目标放在静态资源目录；应选择与原数据故障域不同的位置。尚未初始化的服务器会跳过备份。自定义后端端口时，设置对应的 `API_URL`。
+
+备份工具从 `DATA_DIR/access.json` 读取访问凭据，只连接本机 HTTP 地址并拒绝重定向。快照只包含看板数据，不包含访问密码。更改 `DATA_DIR` 时，也要同步更新备份服务中的同名配置。
 
 ### 恢复
 

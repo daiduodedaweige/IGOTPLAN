@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const os = require("node:os");
+const http = require("node:http");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
 const { createApp } = require("../server");
@@ -100,4 +101,16 @@ test("备份工具使用本地凭据，拒绝向外部地址和重定向发送�
   await assert.rejects(exec(process.execPath, [path.join(ROOT, "scripts/data.js"), "backup", destination], {
     env: { ...env, API_URL: "http://evil.example" },
   }), /本机 HTTP 地址/);
+  let requests = 0;
+  const redirector = http.createServer((req, res) => {
+    requests++;
+    res.writeHead(302, { Location: "/redirected" });
+    res.end();
+  });
+  await new Promise((resolve) => redirector.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => redirector.close(resolve)));
+  await assert.rejects(exec(process.execPath, [path.join(ROOT, "scripts/data.js"), "backup", destination], {
+    env: { ...env, API_URL: `http://127.0.0.1:${redirector.address().port}` },
+  }), /fetch failed/);
+  assert.equal(requests, 1, "凭据不会被发送到重定向目标");
 });
