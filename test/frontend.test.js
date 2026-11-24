@@ -8,6 +8,7 @@ const { webcrypto } = require("node:crypto");
 const { JSDOM } = require("jsdom");
 const { createApp } = require("../server");
 const { emptyState } = require("../state-model");
+const { loadCredentials, authorizationHeader } = require("../lib/auth");
 const ROOT = path.resolve(__dirname, "..");
 const quiet = { error() {}, warn() {} };
 async function until(check) {
@@ -22,6 +23,7 @@ async function fixture(t) {
   const app = await createApp({ dataDir: path.join(dir, "data"), port: 0, logger: quiet });
   await app.listen();
   const origin = `http://127.0.0.1:${app.server.address().port}`;
+  const authorization = authorizationHeader(await loadCredentials(app.store.dir));
   const doms = [];
   const html = await fs.readFile(path.join(ROOT, "index.html"), "utf8");
   const sources = await Promise.all(["state-model.js", "script.js"].map((name) => fs.readFile(path.join(ROOT, name), "utf8")));
@@ -46,7 +48,7 @@ async function fixture(t) {
         const result = await options.intercept(settings);
         if (result) return result;
       }
-      return fetch(new URL(url, origin), { ...settings, headers: { ...settings.headers, ...(settings.method === "PUT" ? { Origin: origin } : {}) } });
+      return fetch(new URL(url, origin), { ...settings, headers: { Authorization: authorization, ...settings.headers, ...(settings.method === "PUT" ? { Origin: origin } : {}) } });
     };
     sources.forEach((source) => window.eval(source));
     const document = window.document;
@@ -62,7 +64,7 @@ async function fixture(t) {
       snapshotStorage() { return Object.fromEntries(Array.from({ length: window.localStorage.length }, (_, index) => { const key = window.localStorage.key(index); return [key, window.localStorage.getItem(key)]; })); },
     };
   }
-  return { app, page, state: async () => (await fetch(origin + "/api/state")).json() };
+  return { app, page, state: async () => (await fetch(origin + "/api/state", { headers: { Authorization: authorization } })).json() };
 }
 
 test("加载完成前禁止编辑，长期任务、奖励、积分在新页面中保留", async (t) => {

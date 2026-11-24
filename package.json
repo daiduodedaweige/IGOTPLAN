@@ -7,20 +7,28 @@
     "start": "node server.js",
     "test": "node --test test/*.test.js",
     "backup": "node scripts/data.js backup",
-    "restore": "node scripts/data.js restore"
+    "restore": "node scripts/data.js restore",
+    "credentials": "node scripts/credentials.js",
+    "build:vendor": "node scripts/build-vendor.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.22.3"
   },
   "dependencies": {
     "pixi-live2d-display": "^0.4.0",
     "pixi.js": "^6.5.10"
   },
   "devDependencies": {
+    "esbuild": "0.28.2",
     "jsdom": "^26.1.0"
+  },
+  "overrides": {
+    "gh-pages": "6.3.0",
+    "qs": "6.17.1",
+    "brace-expansion": "^1.1.21"
   }
 }

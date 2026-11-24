@@ -4,10 +4,20 @@ const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const { Store, writeAtomic } = require("../lib/store");
 const { validateDocument } = require("../state-model");
+const { loadCredentials, authorizationHeader } = require("../lib/auth");
 
 async function backup(destination, url = process.env.API_URL || "http://127.0.0.1:8000") {
   if (!destination) throw new Error("请指定独立备份目录：npm run backup -- /绝对路径/备份目录");
-  const response = await fetch(new URL("/api/state", url), { signal: AbortSignal.timeout(15000) });
+  const endpoint = new URL("/api/state", url);
+  if (endpoint.protocol !== "http:" || !["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname) || endpoint.username || endpoint.password) {
+    throw new Error("备份接口必须使用本机 HTTP 地址，避免向其他主机发送访问凭据。");
+  }
+  const directoryForCredentials = path.resolve(__dirname, "..", process.env.DATA_DIR || "data");
+  const credentials = await loadCredentials(directoryForCredentials);
+  const response = await fetch(endpoint, {
+    signal: AbortSignal.timeout(15000), redirect: "error",
+    headers: { Authorization: authorizationHeader(credentials) },
+  });
   if (!response.ok) throw new Error(`无法读取服务器数据 (${response.status})`);
   const input = await response.json();
   if (input.initialized === false) { console.log("服务器尚未初始化，无需备份。"); return; }

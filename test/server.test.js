@@ -10,6 +10,7 @@ const { promisify } = require("node:util");
 const { once } = require("node:events");
 const { createApp } = require("../server");
 const { emptyState, parseImport } = require("../state-model");
+const { loadCredentials, authorizationHeader } = require("../lib/auth");
 const exec = promisify(execFile);
 const ROOT = path.resolve(__dirname, "..");
 const quiet = { error() {}, warn() {} };
@@ -28,8 +29,11 @@ async function fixture(t, options = {}) {
     await app.listen();
     apps.push(app);
     const url = `http://127.0.0.1:${app.server.address().port}`;
-    return { app, url, get: async () => (await fetch(url + "/api/state")).json(),
-      put: (revision, state) => fetch(url + "/api/state", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: revision, state }) }),
+    const authorization = authorizationHeader(await loadCredentials(dir));
+    const request = (pathname, options = {}) => fetch(url + pathname, { ...options, headers: { Authorization: authorization, ...options.headers } });
+    return { app, url, request, raw: (pathname, headers = {}) => rawRequest(url, pathname, { Authorization: authorization, ...headers }),
+      get: async () => (await request("/api/state")).json(),
+      put: (revision, state) => request("/api/state", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: revision, state }) }),
       stop: async () => { apps.splice(apps.indexOf(app), 1); await app.close(); } };
   }
   return { root, dir, start };
@@ -79,11 +83,11 @@ test("非法输入、超大请求和跨站写入被拒绝，数据保持不变",
   invalid.tasks[0].points = -1;
   assert.equal((await client.put(1, invalid)).status, 400);
   assert.equal((await client.put(1, { tasks: [] })).status, 400);
-  const endpoint = client.url + "/api/state";
-  assert.equal((await fetch(endpoint, { method: "PUT", body: "{}" })).status, 415);
-  assert.equal((await fetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{" })).status, 400);
-  assert.equal((await fetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json", Origin: "http://evil.example" }, body: JSON.stringify({ expectedRevision: 1, state: emptyState() }) })).status, 403);
-  assert.equal((await fetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: "x".repeat(2 * 1024 * 1024 + 1) })).status, 413);
+  const endpoint = "/api/state";
+  assert.equal((await client.request(endpoint, { method: "PUT", body: "{}" })).status, 415);
+  assert.equal((await client.request(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{" })).status, 400);
+  assert.equal((await client.request(endpoint, { method: "PUT", headers: { "Content-Type": "application/json", Origin: "http://evil.example" }, body: JSON.stringify({ expectedRevision: 1, state: emptyState() }) })).status, 403);
+  assert.equal((await client.request(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: "x".repeat(2 * 1024 * 1024 + 1) })).status, 413);
   assert.equal((await client.get()).revision, 1);
 });
 
@@ -91,14 +95,14 @@ test("静态资源可访问，数据、源码、隐藏目录和路径穿越不�
   const { start, dir } = await fixture(t);
   const client = await start();
   await client.put(0, sample());
-  for (const name of ["/", "/script.js", "/state-model.js", "/assets/live2d/Tororo/Tororo.model3.json"]) assert.equal((await fetch(client.url + name)).status, 200);
-  for (const name of ["/data/state.json", "/data/backups/", "/server.js", "/plan.md", "/package.json", "/.env", "/assets/%2e%2e/data/state.json", "/assets/%2e%2e/%2e%2e/etc/passwd", "/assets/%00"]) assert.notEqual(await rawRequest(client.url, name), 200, name);
-  assert.equal(await rawRequest(client.url, "/api/state", { Host: "evil.example" }), 403);
+  for (const name of ["/", "/script.js", "/state-model.js", "/assets/live2d/Tororo/Tororo.model3.json"]) assert.equal((await client.request(name)).status, 200);
+  for (const name of ["/data/state.json", "/data/backups/", "/server.js", "/plan.md", "/package.json", "/.env", "/assets/%2e%2e/data/state.json", "/assets/%2e%2e/%2e%2e/etc/passwd", "/assets/%00"]) assert.notEqual(await client.raw(name), 200, name);
+  assert.equal(await client.raw("/api/state", { Host: "evil.example" }), 403);
   const symlink = path.join(ROOT, "assets", `igotplan-test-${path.basename(dir)}-${path.basename(path.dirname(dir))}`);
   await fs.symlink(path.join(dir, "state.json"), symlink);
   t.after(() => fs.rm(symlink, { force: true }));
-  assert.equal(await rawRequest(client.url, "/assets/" + path.basename(symlink)), 403);
-  assert.equal((await fetch(client.url + "/api/state")).headers.get("cache-control"), "no-store");
+  assert.equal(await client.raw("/assets/" + path.basename(symlink)), 403);
+  assert.equal((await client.request("/api/state")).headers.get("cache-control"), "no-store");
 });
 
 test("损坏文件不会回退空状态或被覆盖，启动后丢失文件也会停止写入", async (t) => {
@@ -108,7 +112,7 @@ test("损坏文件不会回退空状态或被覆盖，启动后丢失文件也�
   await client.stop();
   await fs.writeFile(path.join(dir, "state.json"), "damaged-original");
   client = await start();
-  assert.equal((await fetch(client.url + "/api/state")).status, 503);
+  assert.equal((await client.request("/api/state")).status, 503);
   assert.equal((await client.put(0, emptyState())).status, 503);
   assert.equal(await fs.readFile(path.join(dir, "state.json"), "utf8"), "damaged-original");
   await client.stop();
@@ -146,8 +150,8 @@ test("备份和恢复工具保留损坏原件、提高版本，并拒绝在线�
   const client = await start();
   await client.put(0, sample());
   const destination = path.join(root, "independent-backups");
-  await assert.rejects(exec(process.execPath, [path.join(ROOT, "scripts/data.js"), "backup", path.join(ROOT, "assets")], { env: { ...process.env, API_URL: client.url } }), /公开静态资源/);
-  await exec(process.execPath, [path.join(ROOT, "scripts/data.js"), "backup", destination], { env: { ...process.env, API_URL: client.url } });
+  await assert.rejects(exec(process.execPath, [path.join(ROOT, "scripts/data.js"), "backup", path.join(ROOT, "assets")], { env: { ...process.env, API_URL: client.url, DATA_DIR: dir } }), /公开静态资源/);
+  await exec(process.execPath, [path.join(ROOT, "scripts/data.js"), "backup", destination], { env: { ...process.env, API_URL: client.url, DATA_DIR: dir } });
   const snapshot = path.join(destination, (await fs.readdir(destination))[0]);
   const env = { ...process.env, DATA_DIR: dir };
   await assert.rejects(exec(process.execPath, [path.join(ROOT, "scripts/data.js"), "restore", snapshot], { env }), /已有进程/);

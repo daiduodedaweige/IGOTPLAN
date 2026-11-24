@@ -5,6 +5,7 @@ const path = require("node:path");
 const os = require("node:os");
 const { Store, HttpError } = require("./lib/store");
 const { validateState } = require("./state-model");
+const { CREDENTIALS_FILE, loadCredentials, createAuthenticator } = require("./lib/auth");
 
 const ROOT = __dirname;
 const MAX_BODY = 2 * 1024 * 1024;
@@ -51,15 +52,24 @@ async function createApp(options = {}) {
   if (inside(realRoot, resolvedDataDir) || inside(resolvedDataDir, assetsRoot)) throw new Error("数据目录不能位于静态资源目录中或包含项目根目录");
   const store = await new Store(dataDir, { backupKeep, logger }).open();
   if (inside(realRoot, store.dir) || inside(store.dir, assetsRoot)) { await store.close(); throw new Error("数据目录不能位于静态资源目录中或包含项目根目录"); }
+  let authenticated;
+  try { authenticated = createAuthenticator(await loadCredentials(store.dir, { create: true })); }
+  catch (error) { await store.close(); throw error; }
   const allowedHosts = new Set(["localhost", "127.0.0.1", "[::1]", os.hostname(), os.hostname().split(".")[0], host]);
   const server = http.createServer(async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "same-origin");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
     try {
       let hostname;
       try { hostname = new URL(`http://${req.headers.host}`).hostname; }
       catch { throw new HttpError(400, "Host 无效"); }
       if (!allowedHosts.has(hostname)) throw new HttpError(403, "访问主机名未获允许");
+      if (!authenticated(req.headers.authorization)) {
+        res.setHeader("WWW-Authenticate", 'Basic realm="I GOT PLAN", charset="UTF-8"');
+        throw new HttpError(401, "请输入访问账号和密码。");
+      }
       const pathname = decodeURIComponent(req.url.split("?")[0]);
       if (pathname.includes("\\") || pathname.includes("\0") || pathname.split("/").some((part) => part.startsWith("."))) throw new HttpError(403, "路径不允许访问");
       if (pathname === "/api/state") {
@@ -118,6 +128,7 @@ if (require.main === module) {
     const address = await app.listen();
     console.log(`I GOT PLAN 已启动：http://${address.address}:${address.port}`);
     console.log(`数据目录：${app.store.dir}`);
+    console.log(`访问认证已启用，凭据保存在数据目录的 ${CREDENTIALS_FILE}；在服务器终端运行 npm run credentials 查看。`);
     let stopping = false;
     const stop = async () => {
       if (stopping) return;
