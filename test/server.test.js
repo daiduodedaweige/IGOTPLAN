@@ -91,7 +91,7 @@ test("静态资源可访问，数据、源码、隐藏目录和路径穿越不�
   const { start, dir } = await fixture(t);
   const client = await start();
   await client.put(0, sample());
-  for (const name of ["/", "/script.js", "/state-model.js", "/assets/live2d/Hiyori/Hiyori.model3.json"]) assert.equal((await fetch(client.url + name)).status, 200);
+  for (const name of ["/", "/script.js", "/state-model.js", "/assets/live2d/Tororo/Tororo.model3.json"]) assert.equal((await fetch(client.url + name)).status, 200);
   for (const name of ["/data/state.json", "/data/backups/", "/server.js", "/plan.md", "/package.json", "/.env", "/assets/%2e%2e/data/state.json", "/assets/%2e%2e/%2e%2e/etc/passwd", "/assets/%00"]) assert.notEqual(await rawRequest(client.url, name), 200, name);
   assert.equal(await rawRequest(client.url, "/api/state", { Host: "evil.example" }), 403);
   const symlink = path.join(ROOT, "assets", `igotplan-test-${path.basename(dir)}-${path.basename(path.dirname(dir))}`);

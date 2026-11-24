@@ -59,16 +59,6 @@ const LIVE2D_LAYOUT = {
     x: 0.5,
     y: 0.98,
   },
-  Mao: {
-    scale: 0.16,
-    x: 0.54,
-    y: 1.02,
-  },
-  Hiyori: {
-    scale: 0.16,
-    x: 0.5,
-    y: 1.34,
-  },
 };
 const LIVE2D_FOCUS_GAIN = {
   x: 1.45,
@@ -300,6 +290,10 @@ function renderSummary() {
   availablePointsNode.textContent = String(available);
 }
 
+function isTaskCompleted(task) {
+  return task.type === "long-term" ? task.completionCount > 0 : task.completed;
+}
+
 function renderTasks() {
   const expandedIds = new Set(Array.from(taskList.querySelectorAll(".task-card[open]"), (card) => card.dataset.taskId));
   taskList.innerHTML = "";
@@ -309,7 +303,8 @@ function renderTasks() {
     return;
   }
 
-  for (const task of state.tasks) {
+  const sortedTasks = [...state.tasks].sort((a, b) => Number(isTaskCompleted(a)) - Number(isTaskCompleted(b)));
+  for (const task of sortedTasks) {
     const node = taskTemplate.content.firstElementChild.cloneNode(true);
     node.dataset.taskId = task.id;
     node.open = expandedIds.has(task.id);
@@ -337,7 +332,7 @@ function renderTasks() {
     node.querySelector(".task-status").textContent = task.type === "long-term"
       ? `已完成 ${task.completionCount} 次`
       : task.completed ? "已完成" : "待完成";
-    const hasStamp = task.type === "single" ? task.completed : task.completionCount > 0;
+    const hasStamp = isTaskCompleted(task);
     const stamp = node.querySelector(".completion-stamp");
     stamp.hidden = !hasStamp;
     stamp.setAttribute("aria-label", task.type === "long-term" ? `已完成 ${task.completionCount} 次` : "已完成");
@@ -1110,7 +1105,7 @@ function fitLive2DModel() {
   if (!live2dApp || !live2dModel) return;
 
   live2dModel.anchor.set(0.5, 1);
-  const layout = LIVE2D_LAYOUT[LIVE2D_MODEL.name] || LIVE2D_LAYOUT.Hiyori;
+  const layout = LIVE2D_LAYOUT[LIVE2D_MODEL.name] || LIVE2D_LAYOUT.Tororo;
   const { width, height } = live2dApp.screen;
 
   const scale = layout.autoFit
